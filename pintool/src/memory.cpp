@@ -1,5 +1,6 @@
 #include "pin.H"
 #include <iostream>
+#include <intrin.h>
 
 #include "config.h"
 #include "memory.h"
@@ -20,7 +21,8 @@ inline MEM_MASK getRWX(SEC section);
 #define MAXADDR 0xffffffff
 
 // global storage
-MEM_MASK pages[OS_NUM_PAGES]; // 4GB address space
+typedef std::map < ADDRINT, MEM_MASK > pages_t;
+pages_t pages;
 vector<struct_section> dllTextRanges;
 
 char* whitelistedDLLs[] = { "gdi32.dll",
@@ -721,21 +723,38 @@ VOID MEMORY_AddPebAddress() {
 
 #define ARRAYSIZE 8
 
-	PEB32 *peb;
+	ADDRINT addresses[ ARRAYSIZE ] = { 0 };
+
+#ifdef __i386__
+
+	PEB32 * peb;
 	__asm {
 		mov eax, fs:30h
 		mov peb, eax
 	}
+	addresses[ 0 ] = ( ADDRINT )peb;
+	addresses[ 1 ] = ( ADDRINT )( peb->pShimData );
+	addresses[ 2 ] = ( ADDRINT )( peb->ApiSetMap );
+	addresses[ 3 ] = ( ADDRINT )( peb->AnsiCodePageData );
+	addresses[ 4 ] = ( ADDRINT )( peb->ReadOnlySharedMemoryBase );
+	addresses[ 5 ] = ( ADDRINT )( peb->pContextData );
+	addresses[ 6 ] = ( ADDRINT )( peb->SystemDefaultActivationContextData );
+	addresses[ 7 ] = ( ADDRINT )( peb->ActivationContextData );
 
-	ADDRINT addresses[ARRAYSIZE] = { 0 };
-	addresses[0] = (ADDRINT)peb;
-	addresses[1] = (ADDRINT)(peb->pShimData);
-	addresses[2] = (ADDRINT)(peb->ApiSetMap);
-	addresses[3] = (ADDRINT)(peb->AnsiCodePageData);
-	addresses[4] = (ADDRINT)(peb->ReadOnlySharedMemoryBase);
-	addresses[5] = (ADDRINT)(peb->pContextData);
-	addresses[6] = (ADDRINT)(peb->SystemDefaultActivationContextData);
-	addresses[7] = (ADDRINT)(peb->ActivationContextData);
+#else // __i386__
+
+	PEB64 * peb = ( PEB64 * )__readgsqword( 0x60 );
+	addresses[ 0 ] = ( ADDRINT )peb;
+	addresses[ 1 ] = ( ADDRINT )( *( void ** )( &peb->ptr_pShimData ) );
+	addresses[ 2 ] = ( ADDRINT )( *( void ** )( &peb->ptr_ApiSetMap ) );
+	addresses[ 3 ] = ( ADDRINT )( *( void ** )( &peb->ptr_AnsiCodePageData ) );
+	addresses[ 4 ] = ( ADDRINT )( *( void ** )( &peb->ptr_ReadOnlySharedMemoryBase ) );
+	addresses[ 5 ] = ( ADDRINT )( *( void ** )( &peb->ptr_pContextData ) );
+	addresses[ 6 ] = ( ADDRINT )( *( void ** )( &peb->ptr_SystemDefaultActivationContextData ) );
+	addresses[ 7 ] = ( ADDRINT )( *( void ** )( &peb->ptr_ActivationContextData ) );
+
+#endif // __i386__
+
 
 	for (int i = 0; i < sizeof(addresses)/sizeof(ADDRINT); i++) {
 		if (!addresses[i]) continue;

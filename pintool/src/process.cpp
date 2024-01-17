@@ -7,6 +7,7 @@
 #include <list> 
 #include <iterator> 
 #include <iostream>
+#include <intrin.h>
 
 #define SEG_PROT_R 4
 #define SEG_PROT_W 2
@@ -21,6 +22,13 @@ namespace Process {
 	std::ostream& stringify(std::ostream& out, std::string const& s);
 
 	VOID patchPEB() {
+
+		W::DWORD zero = 0;
+		W::ULONG numCores = BP_NUMCORES;
+		W::HANDLE hProc = ( W::HANDLE )( -1 );
+
+#ifdef __i386__
+
 		PEB32* peb32 = NULL;
 		PEB64* peb64 = NULL;
 		if (isWow64) {
@@ -41,9 +49,6 @@ namespace Process {
 		}
 
 		// patch PEB32
-		W::DWORD zero = 0;
-		W::ULONG numCores = BP_NUMCORES;
-		W::HANDLE hProc = (W::HANDLE)(-1);
 
 		W::WriteProcessMemory(hProc, (&peb32->NumberOfProcessors), &numCores, sizeof(W::DWORD), 0);
 		W::WriteProcessMemory(hProc, (&peb32->BeingDebugged), &zero, sizeof(W::BYTE), 0);
@@ -54,6 +59,18 @@ namespace Process {
 			W::WriteProcessMemory(hProc, (&peb64->BeingDebugged), &zero, sizeof(W::BYTE), 0);
 			W::WriteProcessMemory(hProc, (&peb64->NtGlobalFlag), &zero, sizeof(W::DWORD), 0);
 		}
+
+#else // __i386__
+
+		PEB64 * peb = ( PEB64 * )__readgsqword( 0x60 );
+
+		// patch PEB64
+		W::WriteProcessMemory( hProc, ( W::LPVOID )( &peb->NumberOfProcessors ), &numCores, sizeof( W::DWORD ), 0 );
+		W::WriteProcessMemory( hProc, ( &peb->BeingDebugged ), &zero, sizeof( W::BYTE ), 0 );
+		W::WriteProcessMemory( hProc, ( &peb->NtGlobalFlag ), &zero, sizeof( W::DWORD ), 0 );
+
+#endif // __i386__
+
 	}
 
 	/* From IDAngr - Thanks to Andrea Fioraldi */

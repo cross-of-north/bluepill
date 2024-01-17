@@ -232,7 +232,7 @@ namespace SYSHOOKING {
 
 	static int lookupIndex(const char* syscallName) {
 		for (int i = 0; i < MAXSYSCALLS; ++i) {
-			if (!strcmp(syscallIDs[i], syscallName)) return i;
+			if ( syscallIDs[ i ] && !strcmp(syscallIDs[i], syscallName) ) return i;
 		}
 
 		ASSERT(false, "Unknown system call number");
